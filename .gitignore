@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.local
+.azurite/
+__azurite_db*
+__blobstorage__/
+__queuestorage__/
+api/local.settings.json
+.DS_Store
+.env.*.local
+.deploy-web.local
