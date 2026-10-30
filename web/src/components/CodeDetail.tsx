@@ -12,6 +12,8 @@ import {
 } from "../aggregate";
 import { deviceFromUserAgent, fileSafe, formatDateTime, timeAgo } from "../format";
 import BarChart from "./BarChart";
+import { ArrowLeftIcon, CheckIcon, CopyIcon, DownloadIcon, PencilIcon, TrashIcon } from "./Icons";
+import { ErrorAlert, PageHeader, Panel, Spinner } from "./Layout";
 import QrImage, { downloadPng, downloadSvg } from "./QrImage";
 
 const RANGES = [
@@ -45,6 +47,7 @@ export default function CodeDetail({ id }: { id: string }) {
   const [rangeKey, setRangeKey] = useState<RangeKey>("7d");
   const [granularity, setGranularity] = useState<Granularity>("hour");
   const [window_, setWindow] = useState<{ from: Date; to: Date }>();
+  const [copied, setCopied] = useState(false);
 
   const range = RANGES.find((r) => r.key === rangeKey)!;
 
@@ -82,8 +85,8 @@ export default function CodeDetail({ id }: { id: string }) {
     [timestamps, window_, granularity],
   );
 
-  if (error && !code) return <p className="error">Could not load this QR code: {error}</p>;
-  if (!code || !window_) return <p className="muted">Loading…</p>;
+  if (error && !code) return <ErrorAlert>Could not load this QR code: {error}</ErrorAlert>;
+  if (!code || !window_) return <Spinner label="Loading QR code" />;
 
   const peak = buckets.reduce((best, b) => (b.count > best.count ? b : best), buckets[0]);
   const granularityLabel = GRANULARITIES.find((g) => g.key === granularity)!.label.toLowerCase();
@@ -105,6 +108,12 @@ export default function CodeDetail({ id }: { id: string }) {
     }
   }
 
+  async function copyLink() {
+    await navigator.clipboard.writeText(code!.shortUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
   async function remove() {
     if (!confirm(`Delete "${title}" and all of its scan history? The QR code will stop working.`)) return;
     await deleteCode(id);
@@ -112,114 +121,133 @@ export default function CodeDetail({ id }: { id: string }) {
   }
 
   return (
-    <section className="detail">
-      <a href="#/" className="back">
-        ← All codes
-      </a>
-      <div className="page-head">
-        <h1>
-          {title}{" "}
-          <button className="link small" onClick={rename}>
-            Rename
-          </button>
-        </h1>
-        <button className="button danger" onClick={remove}>
-          Delete
-        </button>
-      </div>
+    <>
+      <PageHeader
+        eyebrow={
+          <a href="#/">
+            <ArrowLeftIcon />
+            All codes
+          </a>
+        }
+        title={title}
+        actions={
+          <>
+            <button className="button button--secondary button--sm" onClick={rename}>
+              <PencilIcon />
+              Rename
+            </button>
+            <button className="button button--danger button--sm" onClick={remove}>
+              <TrashIcon />
+              Delete
+            </button>
+          </>
+        }
+      />
 
       <div className="detail-grid">
-        <aside className="card qr-card">
-          <QrImage value={code.shortUrl} size={220} />
-          <div className="row">
-            <button className="button" onClick={() => downloadPng(code.shortUrl, fileSafe(title))}>
-              PNG
-            </button>
-            <button className="button" onClick={() => downloadSvg(code.shortUrl, fileSafe(title))}>
-              SVG
-            </button>
+        <Panel title="QR code" className="qr-panel">
+          <div className="qr-card">
+            <QrImage value={code.shortUrl} size={220} />
+            <div className="qr-downloads">
+              <button className="button button--secondary button--sm" onClick={() => downloadPng(code.shortUrl, fileSafe(title))}>
+                <DownloadIcon />
+                PNG
+              </button>
+              <button className="button button--secondary button--sm" onClick={() => downloadSvg(code.shortUrl, fileSafe(title))}>
+                <DownloadIcon />
+                SVG
+              </button>
+            </div>
           </div>
-          <dl>
-            <dt>Tracking link</dt>
-            <dd>
-              <code className="truncate" title={code.shortUrl}>
-                {code.shortUrl}
-              </code>
-              <button className="link small" onClick={() => navigator.clipboard.writeText(code.shortUrl)}>
-                Copy
-              </button>
-            </dd>
-            <dt>Destination</dt>
-            <dd>
-              <a href={code.targetUrl} target="_blank" rel="noreferrer" className="truncate" title={code.targetUrl}>
-                {code.targetUrl}
-              </a>
-              <button className="link small" onClick={changeTarget}>
-                Change
-              </button>
-            </dd>
-            <dt>Created</dt>
-            <dd>{formatDateTime(code.createdAt)}</dd>
+          <dl className="qr-facts">
+            <div>
+              <dt>Tracking link</dt>
+              <dd>
+                <code className="truncate" title={code.shortUrl}>
+                  {code.shortUrl}
+                </code>
+                <button className="button button--link" onClick={copyLink}>
+                  {copied ? <CheckIcon /> : <CopyIcon />}
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </dd>
+            </div>
+            <div>
+              <dt>Destination</dt>
+              <dd>
+                <a href={code.targetUrl} target="_blank" rel="noreferrer" className="truncate" title={code.targetUrl}>
+                  {code.targetUrl}
+                </a>
+                <button className="button button--link" onClick={changeTarget}>
+                  Change
+                </button>
+              </dd>
+            </div>
+            <div>
+              <dt>Created</dt>
+              <dd>{formatDateTime(code.createdAt)}</dd>
+            </div>
           </dl>
-        </aside>
+        </Panel>
 
         <div className="stats">
-          <div className="tiles">
-            <div className="card tile">
+          <div className="stat-row stat-row--four">
+            <div className="stat stat--hero">
               <span className="stat-label">Total scans</span>
-              <span className="hero">{code.visitCount.toLocaleString()}</span>
+              <span className="stat-value">{code.visitCount.toLocaleString()}</span>
             </div>
-            <div className="card tile">
+            <div className="stat">
               <span className="stat-label">In selected range</span>
               <span className="stat-value">{visits.length.toLocaleString()}</span>
             </div>
-            <div className="card tile">
+            <div className="stat">
               <span className="stat-label">Busiest {granularityLabel}</span>
               <span className="stat-value">{peak && peak.count > 0 ? peak.count.toLocaleString() : "–"}</span>
-              {peak && peak.count > 0 && (
-                <span className="muted small">{formatBucket(peak.start, granularity)}</span>
-              )}
+              {peak && peak.count > 0 && <span className="stat-note">{formatBucket(peak.start, granularity)}</span>}
             </div>
-            <div className="card tile">
+            <div className="stat">
               <span className="stat-label">Last scan</span>
               <span className="stat-value">{timeAgo(code.lastVisitAt)}</span>
             </div>
           </div>
 
-          <div className="card">
-            <div className="controls">
-              <div className="segmented" role="group" aria-label="Time range">
-                {RANGES.map((r) => (
-                  <button key={r.key} className={r.key === rangeKey ? "on" : ""} onClick={() => selectRange(r.key)}>
-                    {r.label}
-                  </button>
-                ))}
-              </div>
-              <div className="segmented" role="group" aria-label="Group by">
-                {GRANULARITIES.map((g) => {
-                  const tooMany = bucketCount(window_.from, window_.to, g.key) > MAX_BUCKETS;
-                  return (
-                    <button
-                      key={g.key}
-                      className={g.key === granularity ? "on" : ""}
-                      disabled={tooMany}
-                      title={tooMany ? "Too many data points for this range" : undefined}
-                      onClick={() => setGranularity(g.key)}
-                    >
-                      {g.label}
+          <Panel
+            title={`Scans per ${granularityLabel}`}
+            actions={
+              <>
+                <div className="segmented" role="group" aria-label="Time range">
+                  {RANGES.map((r) => (
+                    <button key={r.key} aria-pressed={r.key === rangeKey} onClick={() => selectRange(r.key)}>
+                      {r.label}
                     </button>
-                  );
-                })}
-              </div>
-            </div>
-            <h2>Scans per {granularityLabel}</h2>
+                  ))}
+                </div>
+                <div className="segmented" role="group" aria-label="Group by">
+                  {GRANULARITIES.map((g) => {
+                    const tooMany = bucketCount(window_.from, window_.to, g.key) > MAX_BUCKETS;
+                    return (
+                      <button
+                        key={g.key}
+                        aria-pressed={g.key === granularity}
+                        disabled={tooMany}
+                        title={tooMany ? "Too many data points for this range" : undefined}
+                        onClick={() => setGranularity(g.key)}
+                      >
+                        {g.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            }
+          >
             <BarChart
               labels={buckets.map((b) => formatBucket(b.start, granularity))}
               values={buckets.map((b) => b.count)}
               ariaLabel={`Scans per ${granularityLabel}, ${range.label} range`}
             />
-            <details>
-              <summary className="muted small">Show as table</summary>
+            <details className="chart-table">
+              <summary>Show as table</summary>
               <table>
                 <thead>
                   <tr>
@@ -240,25 +268,22 @@ export default function CodeDetail({ id }: { id: string }) {
                 </tbody>
               </table>
             </details>
-          </div>
+          </Panel>
 
           <div className="two-col">
-            <div className="card">
-              <h2>By hour of day</h2>
+            <Panel title="By hour of day">
               <BarChart labels={HOURS} values={byHourOfDay(timestamps)} ariaLabel="Scans by hour of day" height={180} />
-            </div>
-            <div className="card">
-              <h2>By day of week</h2>
+            </Panel>
+            <Panel title="By day of week">
               <BarChart labels={WEEKDAYS} values={byDayOfWeek(timestamps)} ariaLabel="Scans by day of week" height={180} />
-            </div>
+            </Panel>
           </div>
 
-          <div className="card">
-            <h2>Recent scans</h2>
+          <Panel title="Recent scans" description="The latest 25 in the selected range." flush>
             {recent.length === 0 ? (
-              <p className="muted">No scans in this range yet.</p>
+              <p className="panel-empty">No scans in this range yet.</p>
             ) : (
-              <table>
+              <table className="data-table">
                 <thead>
                   <tr>
                     <th>Time</th>
@@ -277,9 +302,9 @@ export default function CodeDetail({ id }: { id: string }) {
                 </tbody>
               </table>
             )}
-          </div>
+          </Panel>
         </div>
       </div>
-    </section>
+    </>
   );
 }

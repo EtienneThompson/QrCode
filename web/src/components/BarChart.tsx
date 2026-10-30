@@ -6,31 +6,22 @@ import {
   Tooltip,
   type ChartOptions,
 } from "chart.js";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { Bar } from "react-chartjs-2";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip);
+ChartJS.defaults.font.family = "'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
-/** Reads the chart color tokens from CSS, re-reading when the color scheme flips. */
-function useChartColors() {
-  const read = () => {
-    const css = getComputedStyle(document.documentElement);
-    const v = (name: string) => css.getPropertyValue(name).trim();
-    return {
-      bar: v("--series-1"),
-      barHover: v("--series-1-hover"),
-      grid: v("--grid"),
-      text: v("--text-secondary"),
-    };
+/** Reads the chart color tokens from CSS. */
+function chartColors() {
+  const css = getComputedStyle(document.documentElement);
+  const v = (name: string) => css.getPropertyValue(name).trim();
+  return {
+    bar: v("--series-1"),
+    barHover: v("--series-1-hover"),
+    grid: v("--grid"),
+    text: v("--text-muted"),
   };
-  const [colors, setColors] = useState(read);
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setColors(read());
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-  return colors;
 }
 
 interface Props {
@@ -50,7 +41,7 @@ export default function BarChart({
   height = 260,
   formatValue = (n) => `${n.toLocaleString()} scan${n === 1 ? "" : "s"}`,
 }: Props) {
-  const colors = useChartColors();
+  const colors = useMemo(chartColors, []);
 
   const options: ChartOptions<"bar"> = {
     responsive: true,
