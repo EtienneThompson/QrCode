@@ -3,6 +3,8 @@ import { getClientId, signIn, signOut } from "./auth";
 import CodeDetail from "./components/CodeDetail";
 import CodeList from "./components/CodeList";
 import CreateCode from "./components/CreateCode";
+import { LockIcon, LogInIcon, LogOutIcon, PlusIcon } from "./components/Icons";
+import { PublicShell, SplashCard, Topbar } from "./components/Layout";
 
 type Route = { page: "list" } | { page: "new" } | { page: "detail"; id: string };
 
@@ -23,45 +25,43 @@ export default function App() {
     return () => window.removeEventListener("hashchange", onChange);
   }, []);
 
+  if (!signedIn) {
+    return (
+      <PublicShell>
+        <SplashCard
+          icon={<LockIcon />}
+          title="Sign in required"
+          description="Sign in with your Etienne Thompson account to manage your QR codes."
+        >
+          <button className="button button--primary button--full" onClick={signIn}>
+            <LogInIcon />
+            Sign in
+          </button>
+        </SplashCard>
+      </PublicShell>
+    );
+  }
+
   return (
-    <>
-      <header className="topbar">
-        <a href="#/" className="brand">
-          <span className="brand-mark" aria-hidden>▦</span> QR Tracker
+    <div className="host">
+      <Topbar>
+        <a href="#/" className={`host-nav-link ${route.page === "list" ? "active" : ""}`}>
+          My codes
         </a>
-        {signedIn && (
-          <nav>
-            <a href="#/" className={route.page === "list" ? "active" : ""}>
-              My codes
-            </a>
-            <a href="#/new" className={`button ${route.page === "new" ? "active" : ""}`}>
-              + New QR code
-            </a>
-            <span className="account">
-              <button className="link small" onClick={signOut}>
-                Sign out
-              </button>
-            </span>
-          </nav>
-        )}
-      </header>
-      <main>
-        {!signedIn ? (
-          <section className="card narrow empty">
-            <h1>Sign in</h1>
-            <p className="muted">Sign in with your Etienne Thompson account to manage your QR codes.</p>
-            <button className="button primary" onClick={signIn}>
-              Sign in
-            </button>
-          </section>
-        ) : (
-          <>
-            {route.page === "list" && <CodeList />}
-            {route.page === "new" && <CreateCode />}
-            {route.page === "detail" && <CodeDetail id={route.id} />}
-          </>
-        )}
+        <a href="#/new" className="button button--primary button--sm">
+          <PlusIcon />
+          <span>New QR code</span>
+        </a>
+        <button className="host-sign-out" onClick={signOut}>
+          <LogOutIcon />
+          <span>Sign out</span>
+        </button>
+      </Topbar>
+      <main className="host-content" key={route.page === "detail" ? route.id : route.page}>
+        {route.page === "list" && <CodeList />}
+        {route.page === "new" && <CreateCode />}
+        {route.page === "detail" && <CodeDetail id={route.id} />}
       </main>
-    </>
+    </div>
   );
 }
