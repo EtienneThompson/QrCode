@@ -27,11 +27,11 @@ Web app ──▶ /qr/codes…  (API) ──▶ Postgres
 | `scripts/deploy-web.sh` | Builds the web app and uploads it over SSH (e.g. DreamHost). |
 
 The backend lives in the api.etiennethompson.com repo: `src/routes/QrTrackerHandler.ts` and
-`migrations/002_qr_tracker.sql`.
+`migrations/002_qr_tracker.sql` / `004_qr_tracker_owners.sql`.
 
 ### Data model (Postgres)
 
-- **qr_codes**: `codeid` (the short id in the link), `name`, `target_url`, `created_at`, `visit_count`, `last_visit_at`.
+- **qr_codes**: `codeid` (the short id in the link), `userid` (the owner), `name`, `target_url`, `created_at`, `visit_count`, `last_visit_at`.
 - **qr_visits**: `codeid`, `visited_at`, `user_agent`, `referer`. Indexed on `(codeid, visited_at)`.
   Deleting a code deletes its visits.
 
@@ -40,7 +40,7 @@ The backend lives in the api.etiennethompson.com repo: `src/routes/QrTrackerHand
 Routes on api.etiennethompson.com. Like every route there, they need `clientid` (from the login service) and
 `appid` (QR Tracker's application id): in the query string for `GET`, in the JSON body otherwise. The user must
 be a user or admin of QR Tracker, and the `appid` must be QR Tracker's. Missing or expired sessions get `401`,
-and users without access get `403`.
+and users without access get `403`. Each user only sees their own codes; anyone else's get `404`.
 
 | Method | Route | |
 |---|---|---|
@@ -56,7 +56,8 @@ and users without access get `403`.
    **QR Tracker** with redirect URL `https://qr.etiennethompson.com/` (your site's address, with the trailing `/`
    and no `#`). Note its application id. Then give yourself, and anyone else who should have access,
    an application-user entry for it with *isuser* (or *isadmin*) checked.
-2. **Create the tables.** In api.etiennethompson.com: `APP_ENV=production yarn run migrate 002_qr_tracker.sql`.
+2. **Create the tables.** In api.etiennethompson.com: `APP_ENV=production yarn run migrate 002_qr_tracker.sql`,
+   then `004_qr_tracker_owners.sql`.
 3. **Configure the API** (Vercel environment variables, then redeploy):
    - `QR_APPLICATION_ID`: the application id from step 1. Without it, every `/qr/codes` call is refused.
    - `QR_PUBLIC_BASE_URL`: the site that forwards scan links, e.g. `https://qr.etiennethompson.com`.
